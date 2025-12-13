@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import './styles.css';
 import weatherImages from './weatherImages';
 
-const API_KEY = 'e5e8dd66e7eeb92e7d29dd84a145b899';
+const API_KEY = import.meta.env.VITE_API_KEY;
 const MAX_HISTORY = 5;
 
 export default function WeatherApp() {
@@ -21,11 +21,6 @@ export default function WeatherApp() {
   const typingTimer = useRef(null);
   const inputRef = useRef(null);
   const weatherRef = useRef(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('weatherHistory');
-    if (saved) setHistory(JSON.parse(saved));
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('weatherHistory', JSON.stringify(history));
@@ -106,7 +101,7 @@ export default function WeatherApp() {
   };
 
   const fetchWeather = async (inputCity) => {
-    if (!inputCity.trim()) return;
+    if (!inputCity || !inputCity.trim()) return;
     setLoading(true);
     setError('');
     setInfoMessage('');
@@ -133,7 +128,7 @@ export default function WeatherApp() {
       setWeather(data);
 
       const formattedCity = `${data.name}, ${data.sys.country}`;
-      addToHistory(formattedCity);
+      addToHistory(formattedCity, data);
       localStorage.setItem('lastCity', inputCity);
     } catch (err) {
       console.error('Weather fetch error:', err);
@@ -144,14 +139,27 @@ export default function WeatherApp() {
     }
   };
 
-  const addToHistory = (newCity) => {
-    if (!newCity.trim()) return;
+  const addToHistory = (city, weather) => {
+    if (!city || !city.trim() || !weather) return;
+
+    const time = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const newItem = {
+      city,
+      temp: weather.main?.temp.toFixed(1) || null,
+      icon: weather.weather[0].icon || null,
+      time,
+      type: 'history',
+    };
+
     setHistory((prev) => {
       const withoutDup = prev.filter(
-        (c) => c.toLowerCase() !== newCity.toLowerCase()
+        (item) => item.city.toLowerCase() !== city.toLowerCase()
       );
-      const updated = [newCity, ...withoutDup].slice(0, MAX_HISTORY);
-      return updated;
+      return [newItem, ...withoutDup].slice(0, MAX_HISTORY);
     });
   };
 
@@ -218,6 +226,7 @@ export default function WeatherApp() {
   };
 
   const handleSuggestionSelect = (selection) => {
+    if (!selection || !selection.trim()) return;
     setCity(selection);
     setSuggestions([]);
     setShowList(false);
@@ -229,12 +238,13 @@ export default function WeatherApp() {
       type: 'suggestion',
       name: item.name || item,
     })),
+
     ...(history.length > 0
       ? [
           { type: 'divider', name: 'Recent Searches' },
           ...history.map((item) => ({
+            ...item,
             type: 'history',
-            name: item.name || item,
           })),
           { type: 'clear', name: '🗑️ Clear History' },
         ]
@@ -323,21 +333,6 @@ export default function WeatherApp() {
     button.appendChild(circle);
   };
 
-  /*const ripple = (e) => {
-    const btn = e.currentTarget;
-    const rect = btn.getBoundingClientRect();
-
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    btn.style.setProperty('--x', `${x}px`);
-    btn.style.setProperty('--y', `${y}px`);
-
-    btn.classList.remove('ripple-active');
-    void btn.offsetWidth; // forces reflow so animation restarts
-    btn.classList.add('ripple-active');
-  };*/
-
   const getTimePeriod = (weather) => {
     if (!weather || !weather.sys) return '#b8e2fe)';
 
@@ -346,10 +341,10 @@ export default function WeatherApp() {
     const sunrise = sys.sunrise + timezone;
     const sunset = sys.sunset + timezone;
 
-    const dawnStart = sunrise - 10800; // 900 / 1800 = 15 / 30 mins
-    const dawnEnd = sunrise + 10900; // 10800 ~3 hours for testing purpose
-    const duskStart = sunset - 10900;
-    const duskEnd = sunset + 10800;
+    const dawnStart = sunrise - 1800; // 900/1800 = 15/30 mins
+    const dawnEnd = sunrise + 900;
+    const duskStart = sunset - 900;
+    const duskEnd = sunset + 1800;
 
     if (now >= dawnStart && now <= dawnEnd) return 'dawn';
     if (now > dawnEnd && now < duskStart) return 'day';
@@ -360,15 +355,15 @@ export default function WeatherApp() {
   const getBackgroundColor = (weather) => {
     const periodState = getTimePeriod(weather);
     if (periodState === 'day') {
-      return 'linear-gradient(to bottom, rgba(146, 213, 254, 1), rgba(236, 245, 252, 1))';
+      return 'linear-gradient(180deg, rgba(146, 213, 254, 1), rgba(236, 245, 252, 1))';
     }
     if (periodState === 'dawn') {
       return 'linear-gradient(180deg, #ff9a8b, #ff6a88, #e9b4f4)';
     }
     if (periodState === 'dusk') {
-      return 'linear-gradient(180deg, #243d55, #a683bfff, #fc8e7dff)';
+      return 'linear-gradient(180deg, #5a71c2ff, #ae7bd2ff, #fc8e7dff)';
     }
-    return 'linear-gradient(to bottom, rgba(61, 75, 101, 1), rgba(26, 35, 51, 1))'; // night
+    return 'linear-gradient(180deg, rgba(44, 80, 148, 1), rgba(26, 35, 51, 1))';
   };
 
   const getFontColor = (weather) => {
@@ -380,7 +375,7 @@ export default function WeatherApp() {
     ) {
       return '#0a0f2d';
     }
-    return '#bcd4f6'; // night
+    return '#bcd4f6';
   };
 
   const appStyle = {
@@ -412,7 +407,6 @@ export default function WeatherApp() {
 
     for (const key in mapping) {
       const rule = mapping[key];
-
       if (rule.value && id === rule.value) return key;
       if (rule.min && rule.max && id >= rule.min && id <= rule.max) return key;
       if (rule.list && rule.list.includes(id)) return key;
@@ -420,9 +414,10 @@ export default function WeatherApp() {
 
     return null;
   };
-  // --- Determine day/night for weather images
+
+  // Determine day/night for weather images
   const getWeatherTimeState = (weather) => {
-    if (!weather || !weather.sys) return 'night'; // fallback
+    if (!weather || !weather.sys) return 'night';
 
     const { dt, timezone, sys } = weather;
     const now = dt + timezone;
@@ -434,12 +429,12 @@ export default function WeatherApp() {
     const duskStart = sunset - 900;
     const duskEnd = sunset + 1800;
 
-    if (now >= dawnStart && now <= dawnEnd) return 'day'; // treat dawn as day
+    if (now >= dawnStart && now <= dawnEnd) return 'day';
     if (now > dawnEnd && now < duskStart) return 'day';
-    if (now >= duskStart && now <= duskEnd) return 'night'; // treat dusk as night
+    if (now >= duskStart && now <= duskEnd) return 'night';
     return 'night';
   };
-  // --- Convert timeState to image prefix for weatherImages keys
+  // Convert timeState to image prefix for weatherImages keys
   const getImageTimePrefix = (timeState) => {
     if (timeState === 'dawn') return 'day';
     if (timeState === 'dusk') return 'night';
@@ -447,12 +442,12 @@ export default function WeatherApp() {
   };
 
   let weatherImage = null;
-  let isDayTime = true;
+  /*let isDayTime = true;*/
 
   if (weather) {
     const timeState = getWeatherTimeState(weather);
     const period = getImageTimePrefix(timeState);
-    isDayTime = period === 'day';
+    /*isDayTime = period === 'day';*/
 
     const key = getWeatherKey(weather.weather[0].id);
     const finalKey = `${period}_${key}`;
@@ -472,9 +467,8 @@ export default function WeatherApp() {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
 
-  // {weather.wind?.deg} ° {windDirection}
   const getWindDirection = (deg) => {
-    if (deg == null) return ''; // safety
+    if (deg == null) return '';
 
     const directions = [
       'N',
@@ -566,9 +560,27 @@ export default function WeatherApp() {
                     className={`dropdown-item ${
                       index === selectedIndex ? 'active' : ''
                     } ${item.type === 'history' ? 'saved-history' : ''}`}
-                    onMouseDown={() => handleSuggestionSelect(item.name)}
+                    onMouseDown={() => {
+                      if (item.type === 'suggestion') {
+                        handleSuggestionSelect(item.name);
+                      } else if (item.type === 'history') {
+                        handleSuggestionSelect(item.city);
+                      }
+                    }}
                   >
-                    {item.name}
+                    {item.type === 'suggestion' && <span>{item.name}</span>}
+                    {item.type === 'history' && (
+                      <span className="recent-search-item">
+                        <span className="city">{item.city}</span>
+                        <span className="weather-mini">
+                          <img
+                            src={`https://openweathermap.org/img/wn/${item.icon}.png`}
+                            alt="icon"
+                          />
+                          {item.temp}°C
+                        </span>
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -632,7 +644,9 @@ export default function WeatherApp() {
 
             {/*Description + Temperature*/}
             <div className="description-temperature">
-              <p>{capitalize(weather.weather[0].description)}</p>
+              <p className="temp-line" style={{ fontSize: '1.8rem' }}>
+                {capitalize(weather.weather[0].description)}
+              </p>
               <p className="temp-line">
                 <span className="material-symbols-outlined icon">
                   thermometer
@@ -641,27 +655,25 @@ export default function WeatherApp() {
                   {weather.main?.temp.toFixed(1)} °C
                 </span>
               </p>
+              <p className="temp-line">
+                <span className="temp-line" style={{ fontSize: '1.4rem' }}>
+                  Feels Like
+                </span>
+                <span className="temp-value" style={{ fontSize: '1.8rem' }}>
+                  {' '}
+                  {weather.main?.feels_like.toFixed(1)} °C
+                </span>
+              </p>
             </div>
             {/* WEATHER DETAILS */}
             <div className="weather-details-grid">
               {/* Left Column*/}
               <div className="detail-group">
                 <div className="detail-item">
-                  <p className="label">Feels Like</p>
-                  <p className="value">
-                    {' '}
-                    {weather.main?.feels_like.toFixed(1)} °C
-                  </p>
+                  <p className="label">Humidity</p>
+                  <p className="value">{weather.main?.humidity} %</p>
                 </div>
 
-                <div className="detail-item">
-                  <p className="label">TimeZone</p>
-                  <p className="value">
-                    GMT
-                    {(weather.timezone / 3600 >= 1 ? '+' : '') +
-                      weather.timezone / 3600}
-                  </p>
-                </div>
                 <div className="detail-item">
                   <p className="label">Sunrise</p>
                   <p className="value">
@@ -685,37 +697,16 @@ export default function WeatherApp() {
                   </p>
                 </div>
                 <div className="detail-item">
-                  <p
-                    className="label value"
-                    style={{
-                      textAlign: 'center',
-                      fontSize: '10px',
-                      opacity: 0.7,
-                    }}
-                  >
-                    Last Updated {' · '}
-                    {weather.name}
-                    {' · '}
-                    {new Date(
-                      (weather.dt + weather.timezone) * 1000
-                    ).toLocaleString('en-GB', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                      year: '2-digit',
-                      hour: 'numeric',
-                      minute: 'numeric',
-                    })}
+                  <p className="label">TimeZone</p>
+                  <p className="value">
+                    GMT{' '}
+                    {(weather.timezone / 3600 >= 1 ? '+' : '') +
+                      weather.timezone / 3600}
                   </p>
                 </div>
               </div>
               {/* Right Column*/}
               <div className="detail-group">
-                {' '}
-                <div className="detail-item">
-                  <p className="label">Humidity</p>
-                  <p className="value">{weather.main?.humidity} %</p>
-                </div>
                 <div className="detail-item">
                   <p className="label">Visibility</p>
                   <p className="value">
@@ -724,7 +715,14 @@ export default function WeatherApp() {
                 </div>
                 <div className="detail-item">
                   <p className="label">Wind Direction</p>
-                  <p className="value">
+                  <p className="value wind-with-arrow">
+                    <span
+                      className="wind-arrow material-symbols-outlined"
+                      style={{ transform: `rotate(${weather.wind?.deg}deg)` }}
+                    >
+                      north
+                    </span>
+                    {'  '}
                     {weather.wind?.deg} ° {getWindDirection(weather.wind?.deg)}
                   </p>
                 </div>
@@ -738,33 +736,69 @@ export default function WeatherApp() {
                 </div>
               </div>
             </div>
+
             {/*footer*/}
             <p
               style={{
                 textAlign: 'center',
-                fontSize: '10px',
-                opacity: 0.7,
-                marginTop: '20px',
+                fontSize: '16px',
+                opacity: 0.8,
+                marginTop: '40px',
               }}
             >
-              Powered by OpenWeather
+              Last Updated{' '}
+              <span
+                class="material-symbols-outlined"
+                style={{
+                  opacity: 0.8,
+                }}
+              >
+                location_on
+              </span>{' '}
+              {weather.name}
+              {' · '}
+              {new Date((weather.dt + weather.timezone) * 1000).toLocaleString(
+                'en-GB',
+                {
+                  day: 'numeric',
+                  month: 'short',
+                  hour: 'numeric',
+                  minute: 'numeric',
+                }
+              )}
             </p>
-            <p style={{ textAlign: 'center', fontSize: '10px', opacity: 0.7 }}>
-              <p>
-                <em>
-                  GMT now:{' '}
-                  {new Date().toLocaleString('en-GB', {
-                    timeZone: 'UTC',
-                    weekday: 'short',
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  })}
-                </em>
-              </p>
+
+            <p style={{ textAlign: 'center', opacity: 0.9 }}>
+              <strong>GMT Now :</strong>{' '}
+              {new Date().toLocaleString('en-GB', {
+                timeZone: 'UTC',
+                weekday: 'long',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              })}
+            </p>
+            <p
+              style={{
+                fontSize: '0.8rem',
+                opacity: 0.7,
+                marginTop: '30px',
+              }}
+            >
+              Powered by{' '}
+              <a
+                style={{
+                  fontSize: '0.8rem',
+                  opacity: 0.9,
+                }}
+                href="https://openweathermap.org/"
+                target="_blank"
+              >
+                OpenWeatherMap
+              </a>
             </p>
           </div>
         )}
