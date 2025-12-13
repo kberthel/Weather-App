@@ -56,7 +56,7 @@ export default function WeatherApp() {
     let resetTimer;
 
     if (loading) {
-      setPlaceholderText('Fetching data...');
+      setPlaceholderText('Fetching ...');
     } else if (error) {
       setPlaceholderText('Try another city?');
       resetTimer = setTimeout(() => setPlaceholderText('Enter city...'), 1000);
