@@ -13,7 +13,6 @@
 
 body {
   font-family: 'Poppins', sans-serif;
-  color: var(--dark-blue);
   text-align: center;
   background-image: linear-gradient(
     to bottom,
@@ -258,7 +257,6 @@ input:focus::placeholder {
   border-radius: 50%;
   width: 20px;
   height: 20px;
-  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -270,7 +268,6 @@ input:focus::placeholder {
   padding: 10px;
   opacity: 0.6;
   transition: opacity 0.2s ease;
-  /*pointer-events: none;*/
 }
 .reset-btn:hover {
   color: #dd2a56;
@@ -352,6 +349,30 @@ input:focus::placeholder {
   animation: fadeIn 0.6s ease;
 }
 
+.open-search-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--blue);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.search-area {
+  position: relative;
+  margin-top: 12px;
+}
+
+.close-search-btn {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+}
+
 .weather-placeholder {
   display: flex;
   justify-content: center;
@@ -372,18 +393,18 @@ input:focus::placeholder {
   align-items: baseline;
   gap: 6px;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
 }
 
 .temp-line .icon {
   position: relative;
   top: 5px;
-  font-size: 2.8rem;
+  font-size: 1.8rem;
   line-height: 1;
 }
 
 .temp-line .temp-value {
-  font-size: 2.8rem;
+  font-size: 1.8rem;
   line-height: 1;
 }
 
@@ -404,7 +425,7 @@ input:focus::placeholder {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 2px;
-  font-size: 1.2rem;
+  font-size: 1rem;
   /*align-items: baseline;*/
 }
 .detail-item .label {
@@ -419,7 +440,7 @@ input:focus::placeholder {
 }
 
 .weather-result h2 {
-  font-size: 2.8rem;
+  font-size: 2rem;
   padding-top: 20px;
 }
 .weather-result h2,
@@ -447,7 +468,7 @@ input:focus::placeholder {
   display: inline-block;
   margin-left: 6px;
   transition: transform 0.3s ease;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 800;
 }
 
@@ -486,7 +507,7 @@ input:focus::placeholder {
   }
 }
 
-@media (max-width: 500px) {
+@media (max-width: 400px) {
   .weather-result {
     max-width: 90%;
   }

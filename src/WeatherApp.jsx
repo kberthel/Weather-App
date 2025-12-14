@@ -17,6 +17,7 @@ export default function WeatherApp() {
   const [placeholderText, setPlaceholderText] = useState('Enter city...');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [localTime, setLocalTime] = useState(new Date());
+  const [showSearch, setShowSearch] = useState(false);
 
   const typingTimer = useRef(null);
   const inputRef = useRef(null);
@@ -230,6 +231,7 @@ export default function WeatherApp() {
     setCity(selection);
     setSuggestions([]);
     setShowList(false);
+    setShowSearch(false);
     fetchWeather(selection);
   };
 
@@ -496,131 +498,147 @@ export default function WeatherApp() {
   return (
     <div className="app" style={appStyle}>
       <h1>Weather Orbit</h1>
-      <div className="controls">
-        <div className="input-group">
-          <div className="input-wrapper">
-            <input
-              type="text"
-              aria-label="Search"
-              ref={inputRef}
-              value={city}
-              onChange={handleInputChange}
-              placeholder={placeholderText}
-              onFocus={() => {
-                setShowList(true);
-              }}
-              onBlur={() => setTimeout(() => setShowList(false))}
-              onClick={handleInputClick}
-              onKeyDown={handleKeyDown}
-            />
-            {city && (
-              <button
-                type="button"
-                className="reset-btn"
-                onClick={handleReset}
-                aria-label="Clear city"
-              >
-                ✗
-              </button>
-            )}
-          </div>
-
-          {showList && combined.length > 0 && (
-            <ul className={`dropdown-list ${showList ? 'show' : 'hide'}`}>
-              {combined.map((item, index) => {
-                if (item.type === 'divider') {
-                  return (
-                    <li key={`divider-${index}`} className="divider">
-                      {item.name}
-                    </li>
-                  );
-                }
-
-                if (item.type === 'clear') {
-                  return (
-                    <li
-                      key={`clear-${index}`}
-                      className="dropdown-item clear-history"
-                      onMouseDown={() => {
-                        setHistory([]);
-                        localStorage.removeItem('weatherHistory');
-                        setCity('');
-                        setSuggestions([]);
-                        setShowList(false);
-                      }}
-                    >
-                      {item.name}
-                    </li>
-                  );
-                }
-
-                return (
-                  <li
-                    key={`${item.type}-${index}`}
-                    className={`dropdown-item ${
-                      index === selectedIndex ? 'active' : ''
-                    } ${item.type === 'history' ? 'saved-history' : ''}`}
-                    onMouseDown={() => {
-                      if (item.type === 'suggestion') {
-                        handleSuggestionSelect(item.name);
-                      } else if (item.type === 'history') {
-                        handleSuggestionSelect(item.city);
-                      }
-                    }}
+      <button className="open-search-btn" onClick={() => setShowSearch(true)}>
+        <span className="material-symbols-outlined">search</span>
+        {showSearch && (
+          <div className="controls">
+            <div className="input-group">
+              <div className="input-wrapper">
+                <input
+                  type="text"
+                  aria-label="Search"
+                  ref={inputRef}
+                  value={city}
+                  onChange={handleInputChange}
+                  placeholder={placeholderText}
+                  onFocus={() => {
+                    setShowList(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowList(false))}
+                  onClick={handleInputClick}
+                  onKeyDown={handleKeyDown}
+                />
+                {city && (
+                  <button
+                    type="button"
+                    className="reset-btn"
+                    onClick={handleReset}
+                    aria-label="Clear city"
                   >
-                    {item.type === 'suggestion' && <span>{item.name}</span>}
-                    {item.type === 'history' && (
-                      <span className="recent-search-item">
-                        <span className="city">{item.city}</span>
-                        <span className="weather-mini">
-                          <img
-                            src={`https://openweathermap.org/img/wn/${item.icon}.png`}
-                            alt="icon"
-                          />
-                          {item.temp}°C
-                        </span>
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                )}
+              </div>
 
-          {!loading &&
-            !error &&
-            showList &&
-            history.length === 0 &&
-            suggestions.length === 0 && (
-              <div className="info-message">No recent searches</div>
-            )}
-          {loading && (
-            <div className="info-message loading">
-              <div className="spinner"></div>
-              <p>Loading weather...</p>
+              {showList && combined.length > 0 && (
+                <ul className={`dropdown-list ${showList ? 'show' : 'hide'}`}>
+                  {combined.map((item, index) => {
+                    if (item.type === 'divider') {
+                      return (
+                        <li key={`divider-${index}`} className="divider">
+                          {item.name}
+                        </li>
+                      );
+                    }
+
+                    if (item.type === 'clear') {
+                      return (
+                        <li
+                          key={`clear-${index}`}
+                          className="dropdown-item clear-history"
+                          onMouseDown={() => {
+                            setHistory([]);
+                            localStorage.removeItem('weatherHistory');
+                            setCity('');
+                            setSuggestions([]);
+                            setShowList(false);
+                          }}
+                        >
+                          {item.name}
+                        </li>
+                      );
+                    }
+
+                    return (
+                      <li
+                        key={`${item.type}-${index}`}
+                        className={`dropdown-item ${
+                          index === selectedIndex ? 'active' : ''
+                        } ${item.type === 'history' ? 'saved-history' : ''}`}
+                        onMouseDown={() => {
+                          if (item.type === 'suggestion') {
+                            handleSuggestionSelect(item.name);
+                          } else if (item.type === 'history') {
+                            handleSuggestionSelect(item.city);
+                          }
+                        }}
+                      >
+                        {item.type === 'suggestion' && <span>{item.name}</span>}
+                        {item.type === 'history' && (
+                          <span className="recent-search-item">
+                            <span className="city">{item.city}</span>
+                            <span className="weather-mini">
+                              <img
+                                src={`https://openweathermap.org/img/wn/${item.icon}.png`}
+                                alt="icon"
+                              />
+                              {item.temp}°C
+                            </span>
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {!loading &&
+                !error &&
+                showList &&
+                history.length === 0 &&
+                suggestions.length === 0 && (
+                  <div className="info-message">No recent searches</div>
+                )}
+              {loading && (
+                <div className="info-message loading">
+                  <div className="spinner"></div>
+                  <p>Loading weather...</p>
+                </div>
+              )}
+              {/* ERROR MESSAGE */}
+              {error && (
+                <div className="info-message error-message show">
+                  ⚠️ {error}
+                </div>
+              )}
+              {/* INFO MESSAGE */}
+              {!error && infoMessage && (
+                <div className="info-message show">ℹ️ {infoMessage}</div>
+              )}
             </div>
-          )}
-          {/* ERROR MESSAGE */}
-          {error && (
-            <div className="info-message error-message show">⚠️ {error}</div>
-          )}
-          {/* INFO MESSAGE */}
-          {!error && infoMessage && (
-            <div className="info-message show">ℹ️ {infoMessage}</div>
-          )}
-        </div>
 
-        <button
-          className="get-weather-btn ripple-btn"
-          onClick={(e) => {
-            ripple(e);
-            handleSubmit();
-          }}
-          onKeyDown={handleKeyDown}
-        >
-          <span className="material-symbols-outlined">search</span>
-        </button>
-      </div>
+            <button
+              className="get-weather-btn ripple-btn"
+              onClick={(e) => {
+                ripple(e);
+                handleSubmit();
+              }}
+              onKeyDown={handleKeyDown}
+            >
+              <span className="material-symbols-outlined">search</span>
+            </button>
+          </div>
+        )}
+      </button>
+      <button
+        className="close-search-btn"
+        onClick={() => {
+          setShowSearch(false);
+          setShowList(false);
+        }}
+      >
+        ✕
+      </button>
 
       <div className="weather-placeholder">
         {!loading && !error && !weather && (
@@ -644,7 +662,7 @@ export default function WeatherApp() {
 
             {/*Description + Temperature*/}
             <div className="description-temperature">
-              <p className="temp-line" style={{ fontSize: '1.8rem' }}>
+              <p className="temp-line" style={{ fontSize: '1.4rem' }}>
                 {capitalize(weather.weather[0].description)}
               </p>
               <p className="temp-line">
@@ -656,10 +674,10 @@ export default function WeatherApp() {
                 </span>
               </p>
               <p className="temp-line">
-                <span className="temp-line" style={{ fontSize: '1.4rem' }}>
+                <span className="temp-line" style={{ fontSize: '1.2rem' }}>
                   Feels Like
                 </span>
-                <span className="temp-value" style={{ fontSize: '1.8rem' }}>
+                <span className="temp-value" style={{ fontSize: '1.4rem' }}>
                   {' '}
                   {weather.main?.feels_like.toFixed(1)} °C
                 </span>
