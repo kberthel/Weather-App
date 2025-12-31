@@ -17,11 +17,19 @@ export default function WeatherApp() {
   const [placeholderText, setPlaceholderText] = useState('Enter city...');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [localTime, setLocalTime] = useState(new Date());
+  const [showLocalTime, setShowLocalTime] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [isUserTyping, setIsUserTyping] = useState(false);
 
   const typingTimer = useRef(null);
   const inputRef = useRef(null);
   const weatherRef = useRef(null);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('weatherHistory');
+    if (saved) setHistory(JSON.parse(saved));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('weatherHistory', JSON.stringify(history));
@@ -42,16 +50,37 @@ export default function WeatherApp() {
   }, [weather]);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (showSearch && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [showSearch]);
 
   //Setting local time – temp.
-  useEffect(() => {
+  /* useEffect(() => {
     const interval = setInterval(() => {
       setLocalTime(new Date());
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, []);*/
+
+  useEffect(() => {
+    console.log('STATE SNAPSHOT', {
+      loading,
+      error,
+      infoMessage,
+      showSearch,
+    });
+  }, [loading, error, infoMessage, showSearch]);
+
+  useEffect(() => {
+    if (!showLocalTime) return;
+
+    const interval = setInterval(() => {
+      setLocalTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showLocalTime]);
 
   useEffect(() => {
     let resetTimer;
@@ -60,16 +89,50 @@ export default function WeatherApp() {
       setPlaceholderText('Fetching ...');
     } else if (error) {
       setPlaceholderText('Try another city?');
-      resetTimer = setTimeout(() => setPlaceholderText('Enter city...'), 1000);
+      resetTimer = setTimeout(() => setPlaceholderText('Enter city...'), 2000);
     } else if (infoMessage) {
       setPlaceholderText(infoMessage);
-      resetTimer = setTimeout(() => setPlaceholderText('Enter city...'), 1000);
+      resetTimer = setTimeout(() => setPlaceholderText('Enter city...'), 2000);
     } else {
       setPlaceholderText('Enter city...');
       setShowList(false);
     }
     return () => clearTimeout(resetTimer);
   }, [loading, error, infoMessage]);
+
+  /* ⚠️ ℹ️ Dismiss Error/Info Messages 
+  useEffect(() => {
+    if (error || infoMessage) {
+      const timer = setTimeout(() => {
+        setError('');
+        setInfoMessage('');
+      }, 4000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [error, infoMessage]);
+*/
+  /* auto-scroll on manual submit */
+  useEffect(() => {
+    if (!loading && weather) {
+      setShowSearch(false);
+    }
+  }, [loading, weather]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowList(false);
+        if (!loading) {
+          setShowSearch(false);
+          resetSearchState();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSearch]);
 
   const fetchLocation = async (geoLocation) => {
     if (!geoLocation.trim()) return [];
@@ -106,35 +169,45 @@ export default function WeatherApp() {
     setLoading(true);
     setError('');
     setInfoMessage('');
+    setIsUserTyping(false);
+    setShowList(false);
+
+    /*const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));*/
 
     try {
       const response = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?q=${inputCity.trim()}&appid=${API_KEY}&units=metric`
       );
+      /*await delay(800);*/
+
       if (!response.ok) {
-        setError('City not found');
+        /*setError('City not found');
         setPlaceholderText();
-        setTimeout(() => {
-          setError('');
-          setInfoMessage('');
-          setCity('');
-        }, 1000);
-        return;
+        setShowSearch(true); // ✅ keep panel open for error
+        return false;*/
+        throw new Error('City not found');
       }
 
       await new Promise((res) => setTimeout(res, 150));
 
       const data = await response.json();
-      if (data.cod !== 200) throw new Error(data.message || 'Invalid data');
+      if (data.cod !== 200) {
+        setError(data.message || 'Invalid data');
+        setShowSearch(true); // ✅ keep panel open for error
+        return false;
+      } /*throw new Error(data.message || 'Invalid data');*/
       setWeather(data);
+      setShowSearch(false);
 
       const formattedCity = `${data.name}, ${data.sys.country}`;
       addToHistory(formattedCity, data);
       localStorage.setItem('lastCity', inputCity);
+      return true; // ✅ success
     } catch (err) {
       console.error('Weather fetch error:', err);
       setError(err.message);
-      setCity('');
+      setShowSearch(true); // ✅ show panel for error
+      return false;
     } finally {
       setLoading(false);
     }
@@ -164,16 +237,22 @@ export default function WeatherApp() {
     });
   };
 
-  const handleSubmit = () => {
-    if (city.trim()) {
-      setShowList(false);
-      fetchWeather(city);
+  const handleSubmit = (shouldScroll = false) => {
+    if (!city.trim()) return;
+    setShowList(false);
+    fetchWeather(city);
+    /*fetchWeather(city).then((success) => {
+      if (success) {
+        setShowSearch(false); // ✅ only after success
+      }
+    });*/
+    /*setShowSearch(true);*/
+    /*setWeather();*/
+    if (shouldScroll) {
+      setTimeout(() => {
+        weatherRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
     }
-    setWeather(data);
-
-    setTimeout(() => {
-      weatherRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
   };
 
   const handleInputChange = (e) => {
@@ -183,6 +262,7 @@ export default function WeatherApp() {
     setError('');
     setInfoMessage('');
     setShowList(true);
+    setIsUserTyping(true);
 
     clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(async () => {
@@ -219,6 +299,7 @@ export default function WeatherApp() {
   };
 
   const handleInputClick = () => {
+    setIsUserTyping(true);
     if (city.trim()) {
       setCity('');
       setSuggestions([]);
@@ -233,6 +314,28 @@ export default function WeatherApp() {
     setShowList(false);
     setShowSearch(false);
     fetchWeather(selection);
+  };
+
+  const resetSearchState = () => {
+    if (loading) return;
+    setCity('');
+    setSuggestions([]);
+    setSelectedIndex(-1);
+    setShowList(false);
+    setIsUserTyping(false);
+    setError('');
+    setInfoMessage('');
+  };
+
+  const handleSearchToggle = () => {
+    if (loading) return;
+    resetSearchState();
+    setShowSearch(true);
+  };
+
+  const handleCloseSearch = () => {
+    resetSearchState();
+    setShowSearch(false);
   };
 
   const combined = [
@@ -254,37 +357,37 @@ export default function WeatherApp() {
   ];
 
   const handleKeyDown = (e) => {
-    if (
-      (!showList || combined.length === 0) &&
-      e.key === 'Enter' &&
-      city.trim()
-    ) {
-      e.preventDefault();
-      handleSubmit();
-      return;
-    }
-
-    if (e.key === 'Escape' || (e.key === 'Backspace' && city.trim() === '')) {
+    if (e.key === 'Escape') {
       setShowList(false);
       setSelectedIndex(-1);
       return;
     }
 
-    if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Backspace' && city.trim() === '') {
+      setShowList(false);
+      setSelectedIndex(-1);
+      return;
+    }
+
+    if (e.key === 'Enter' && !showList && city.trim()) {
+      e.preventDefault();
+      handleSubmit();
+      return;
+    }
 
     if (!showList || combined.length === 0) return;
 
+    if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+      e.preventDefault();
+    }
+
     if (e.key === 'ArrowDown') {
-      setSelectedIndex((prev) => (prev < 0 ? 0 : (prev + 1) % combined.length));
+      setSelectedIndex((prev) => (prev < combined.length - 1 ? prev + 1 : 0));
       return;
     }
 
     if (e.key === 'ArrowUp') {
-      setSelectedIndex((prev) =>
-        prev < 0
-          ? combined.length - 1
-          : (prev - 1 + combined.length) % combined.length
-      );
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : combined.length - 1));
       return;
     }
 
@@ -294,7 +397,6 @@ export default function WeatherApp() {
         setShowList(false);
         return;
       }
-
       const chosen = combined[selectedIndex];
       if (!chosen || chosen.type === 'divider') return;
 
@@ -308,9 +410,14 @@ export default function WeatherApp() {
         return;
       }
 
-      handleSuggestionSelect(chosen.name);
-      setSelectedIndex(-1);
+      if (chosen.type === 'suggestion') {
+        handleSuggestionSelect(chosen.name);
+      } else if (chosen.type === 'history') {
+        handleSuggestionSelect(chosen.city);
+      }
+
       setShowList(false);
+      setSelectedIndex(-1);
     }
   };
 
@@ -328,9 +435,16 @@ export default function WeatherApp() {
     const radius = diameter / 2;
 
     circle.style.width = circle.style.height = `${diameter}px`;
-    circle.style.left = `${e.clientX - button.offsetLeft - radius}px`;
-    circle.style.top = `${e.clientY - button.offsetTop - radius}px`;
+    circle.style.left = `${
+      e.clientX - button.getBoundingClientRect().left - radius
+    }px`;
+    circle.style.top = `${
+      e.clientY - button.getBoundingClientRect().top - radius
+    }px`;
     circle.classList.add('ripple');
+
+    const existing = button.getElementsByClassName('ripple')[0];
+    if (existing) existing.remove();
 
     button.appendChild(circle);
   };
@@ -444,12 +558,10 @@ export default function WeatherApp() {
   };
 
   let weatherImage = null;
-  /*let isDayTime = true;*/
 
   if (weather) {
     const timeState = getWeatherTimeState(weather);
     const period = getImageTimePrefix(timeState);
-    /*isDayTime = period === 'day';*/
 
     const key = getWeatherKey(weather.weather[0].id);
     const finalKey = `${period}_${key}`;
@@ -497,148 +609,178 @@ export default function WeatherApp() {
 
   return (
     <div className="app" style={appStyle}>
-      <h1>Weather Orbit</h1>
-      <button className="open-search-btn" onClick={() => setShowSearch(true)}>
-        <span className="material-symbols-outlined">search</span>
-        {showSearch && (
-          <div className="controls">
-            <div className="input-group">
-              <div className="input-wrapper">
-                <input
-                  type="text"
-                  aria-label="Search"
-                  ref={inputRef}
-                  value={city}
-                  onChange={handleInputChange}
-                  placeholder={placeholderText}
-                  onFocus={() => {
-                    setShowList(true);
-                  }}
-                  onBlur={() => setTimeout(() => setShowList(false))}
-                  onClick={handleInputClick}
-                  onKeyDown={handleKeyDown}
-                />
-                {city && (
+      <header className="app-header">
+        <div className="header-row">
+          <h1 className="title">Weather Orbit </h1>
+          {!showSearch && (
+            <button
+              className={`search-toggle ${showSearch ? 'hidden' : ''}`}
+              style={{
+                background: appStyle.background,
+                color: appStyle.color,
+              }}
+              onClick={handleSearchToggle}
+              aria-label="Open search"
+            >
+              <span className="material-symbols-outlined">search</span>
+            </button>
+          )}
+          {showSearch && (
+            <button
+              className={`close-search-btn ${showSearch ? 'show' : ''}`}
+              style={{
+                background: appStyle.background,
+                color: appStyle.color,
+              }}
+              onClick={handleCloseSearch}
+              aria-label="Close search"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          )}
+        </div>
+        <div
+          className={`search-panel ${showSearch ? 'open' : ''}`}
+          ref={searchRef}
+        >
+          {showSearch && (
+            <div className="controls">
+              <div className="input-group">
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    aria-label="Input city"
+                    ref={inputRef}
+                    value={city}
+                    onChange={handleInputChange}
+                    placeholder={placeholderText}
+                    onFocus={() => {
+                      if (isUserTyping) setShowList(true);
+                    }}
+                    onClick={handleInputClick}
+                    onKeyDown={handleKeyDown}
+                  />
+
+                  {city && (
+                    <button
+                      type="button"
+                      className="reset-btn"
+                      onClick={handleReset}
+                      aria-label="Clear city"
+                    >
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="reset-btn"
-                    onClick={handleReset}
-                    aria-label="Clear city"
+                    className="get-weather-btn ripple-btn"
+                    onClick={(e) => {
+                      ripple(e);
+                      handleSubmit();
+                    }}
+                    aria-label="Search city"
                   >
-                    <span class="material-symbols-outlined">close</span>
+                    <span className="material-symbols-outlined">search</span>
                   </button>
-                )}
-              </div>
+                </div>
 
-              {showList && combined.length > 0 && (
-                <ul className={`dropdown-list ${showList ? 'show' : 'hide'}`}>
-                  {combined.map((item, index) => {
-                    if (item.type === 'divider') {
-                      return (
-                        <li key={`divider-${index}`} className="divider">
-                          {item.name}
-                        </li>
-                      );
-                    }
+                {showList && combined.length > 0 && (
+                  <ul className={`dropdown-list ${showList ? 'show' : 'hide'}`}>
+                    {combined.map((item, index) => {
+                      if (item.type === 'divider') {
+                        return (
+                          <li key={`divider-${index}`} className="divider">
+                            {item.name}
+                          </li>
+                        );
+                      }
 
-                    if (item.type === 'clear') {
+                      if (item.type === 'clear') {
+                        return (
+                          <li
+                            key={`clear-${index}`}
+                            className="dropdown-item clear-history"
+                            onMouseDown={() => {
+                              setHistory([]);
+                              localStorage.removeItem('weatherHistory');
+                              setCity('');
+                              setSuggestions([]);
+                              setShowList(false);
+                            }}
+                          >
+                            {item.name}
+                          </li>
+                        );
+                      }
+
                       return (
                         <li
-                          key={`clear-${index}`}
-                          className="dropdown-item clear-history"
+                          key={`${item.type}-${index}`}
+                          className={`dropdown-item ${
+                            index === selectedIndex ? 'active' : ''
+                          } ${item.type === 'history' ? 'saved-history' : ''}`}
                           onMouseDown={() => {
-                            setHistory([]);
-                            localStorage.removeItem('weatherHistory');
-                            setCity('');
-                            setSuggestions([]);
-                            setShowList(false);
+                            if (item.type === 'suggestion') {
+                              handleSuggestionSelect(item.name);
+                            } else if (item.type === 'history') {
+                              handleSuggestionSelect(item.city);
+                            }
                           }}
                         >
-                          {item.name}
+                          {item.type === 'suggestion' && (
+                            <span>{item.name}</span>
+                          )}
+                          {item.type === 'history' && (
+                            <span className="recent-search-item">
+                              <span className="city">{item.city}</span>
+                              <span className="weather-mini">
+                                <img
+                                  src={`https://openweathermap.org/img/wn/${item.icon}.png`}
+                                  alt="icon"
+                                />
+                              </span>
+                              <span className="temp-mini">{item.temp} °C</span>
+                            </span>
+                          )}
                         </li>
                       );
-                    }
-
-                    return (
-                      <li
-                        key={`${item.type}-${index}`}
-                        className={`dropdown-item ${
-                          index === selectedIndex ? 'active' : ''
-                        } ${item.type === 'history' ? 'saved-history' : ''}`}
-                        onMouseDown={() => {
-                          if (item.type === 'suggestion') {
-                            handleSuggestionSelect(item.name);
-                          } else if (item.type === 'history') {
-                            handleSuggestionSelect(item.city);
-                          }
-                        }}
-                      >
-                        {item.type === 'suggestion' && <span>{item.name}</span>}
-                        {item.type === 'history' && (
-                          <span className="recent-search-item">
-                            <span className="city">{item.city}</span>
-                            <span className="weather-mini">
-                              <img
-                                src={`https://openweathermap.org/img/wn/${item.icon}.png`}
-                                alt="icon"
-                              />
-                              {item.temp}°C
-                            </span>
-                          </span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-
-              {!loading &&
+                    })}
+                  </ul>
+                )}
+              </div>
+              {showSearch &&
+                !loading &&
                 !error &&
-                showList &&
+                city.trim() === '' &&
                 history.length === 0 &&
                 suggestions.length === 0 && (
                   <div className="info-message">No recent searches</div>
                 )}
-              {loading && (
-                <div className="info-message loading">
-                  <div className="spinner"></div>
-                  <p>Loading weather...</p>
-                </div>
-              )}
-              {/* ERROR MESSAGE */}
-              {error && (
-                <div className="info-message error-message show">
-                  ⚠️ {error}
-                </div>
-              )}
-              {/* INFO MESSAGE */}
-              {!error && infoMessage && (
-                <div className="info-message show">ℹ️ {infoMessage}</div>
-              )}
             </div>
+          )}
+        </div>
+      </header>
 
-            <button
-              className="get-weather-btn ripple-btn"
-              onClick={(e) => {
-                ripple(e);
-                handleSubmit();
-              }}
-              onKeyDown={handleKeyDown}
-            >
-              <span className="material-symbols-outlined">search</span>
-            </button>
+      {/* GLOBAL MESSAGES – MESSAGE LOADING – SPINNER/ ERROR MESSAGE/ INFO MESSAGE*/}
+      <div className="messages">
+        {loading && (
+          <div className="info-message loading">
+            <div className="spinner"></div>
+            <p>Loading weather...</p>
           </div>
         )}
-      </button>
-      <button
-        className="close-search-btn"
-        onClick={() => {
-          setShowSearch(false);
-          setShowList(false);
-        }}
-      >
-        ✕
-      </button>
+        {!loading && error && (
+          <div className="info-message error-message">
+            <button className="close-msg" onClick={() => setError('')}>
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            ⚠️ {error}
+          </div>
+        )}
+        {!loading && !error && infoMessage && (
+          <div className="info-message">ℹ️ {infoMessage}</div>
+        )}
+      </div>
 
       <div className="weather-placeholder">
         {!loading && !error && !weather && (
@@ -646,12 +788,16 @@ export default function WeatherApp() {
         )}
         {weather && (
           <div ref={weatherRef} className="weather-result">
-            {/*City + Country + Date + Image*/}
-            <h2>
+            {/* City + Country + Date + Image */}
+            <h2 className="city-country">
               {weather.name}
               {weather.sys?.country ? ` · ${weather.sys.country}` : ''}
             </h2>
-
+            <p className="timezone">
+              GMT{' '}
+              {(weather.timezone / 3600 >= 1 ? '+' : '') +
+                weather.timezone / 3600}
+            </p>
             {weatherImage && (
               <img
                 className="weather-graphic"
@@ -659,25 +805,22 @@ export default function WeatherApp() {
                 alt={weather.weather[0].description}
               />
             )}
-
-            {/*Description + Temperature*/}
+            {/* Description + Temperature */}
             <div className="description-temperature">
-              <p className="temp-line" style={{ fontSize: '1.4rem' }}>
+              <p className="temp-line temp-description">
                 {capitalize(weather.weather[0].description)}
               </p>
               <p className="temp-line">
-                <span className="material-symbols-outlined icon">
+                <span className="material-symbols-outlined temp-icon">
                   thermometer
                 </span>
-                <span className="temp-value">
+                <span className="temp-value-tempnow">
                   {weather.main?.temp.toFixed(1)} °C
                 </span>
               </p>
               <p className="temp-line">
-                <span className="temp-line" style={{ fontSize: '1.2rem' }}>
-                  Feels Like
-                </span>
-                <span className="temp-value" style={{ fontSize: '1.4rem' }}>
+                <span className="temp-feelslike">Feels Like</span>
+                <span className="temp-value-feelslike">
                   {' '}
                   {weather.main?.feels_like.toFixed(1)} °C
                 </span>
@@ -685,52 +828,49 @@ export default function WeatherApp() {
             </div>
             {/* WEATHER DETAILS */}
             <div className="weather-details-grid">
+              {/* Top Column*/}
               {/* Left Column*/}
-              <div className="detail-group">
-                <div className="detail-item">
-                  <p className="label">Humidity</p>
-                  <p className="value">{weather.main?.humidity} %</p>
+              <div className="detail-group-top">
+                <div className="detail-group-left">
+                  <div className="detail-item">
+                    <p className="label">Humidity</p>
+                    <p className="value">{weather.main?.humidity} %</p>
+                  </div>
+                  <div className="detail-item">
+                    <p className="label">Visibility</p>
+                    <p className="value">
+                      {(weather.visibility / 1000).toFixed(1)} km
+                    </p>
+                  </div>
                 </div>
-
-                <div className="detail-item">
-                  <p className="label">Sunrise</p>
-                  <p className="value">
-                    {new Date(
-                      (weather.sys?.sunrise + weather.timezone) * 1000
-                    ).toLocaleTimeString('en-GB', {
-                      hour: 'numeric',
-                      minute: 'numeric',
-                    })}
-                  </p>
-                </div>
-                <div className="detail-item">
-                  <p className="label">Sunset</p>
-                  <p className="value">
-                    {new Date(
-                      (weather.sys?.sunset + weather.timezone) * 1000
-                    ).toLocaleTimeString('en-GB', {
-                      hour: 'numeric',
-                      minute: 'numeric',
-                    })}
-                  </p>
-                </div>
-                <div className="detail-item">
-                  <p className="label">TimeZone</p>
-                  <p className="value">
-                    GMT{' '}
-                    {(weather.timezone / 3600 >= 1 ? '+' : '') +
-                      weather.timezone / 3600}
-                  </p>
+                {/* Right Column*/}
+                <div className="detail-group-right">
+                  <div className="detail-item">
+                    <p className="label">Sunrise</p>
+                    <p className="value">
+                      {new Date(
+                        (weather.sys?.sunrise + weather.timezone) * 1000
+                      ).toLocaleTimeString('en-GB', {
+                        hour: 'numeric',
+                        minute: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                  <div className="detail-item">
+                    <p className="label">Sunset</p>
+                    <p className="value">
+                      {new Date(
+                        (weather.sys?.sunset + weather.timezone) * 1000
+                      ).toLocaleTimeString('en-GB', {
+                        hour: 'numeric',
+                        minute: 'numeric',
+                      })}
+                    </p>
+                  </div>
                 </div>
               </div>
-              {/* Right Column*/}
-              <div className="detail-group">
-                <div className="detail-item">
-                  <p className="label">Visibility</p>
-                  <p className="value">
-                    {(weather.visibility / 1000).toFixed(1)} km
-                  </p>
-                </div>
+              {/* Bottom Column*/}
+              <div className="detail-group-wind">
                 <div className="detail-item">
                   <p className="label">Wind Direction</p>
                   <p className="value wind-with-arrow">
@@ -756,21 +896,26 @@ export default function WeatherApp() {
             </div>
 
             {/*footer*/}
-            <p
+            {/*<button
+              className="local-time"
+              type="button"
+              onClick={() => setShowLocalTime((v) => !v)}
+              aria-expanded={showLocalTime}
               style={{
-                textAlign: 'center',
-                fontSize: '16px',
-                opacity: 0.8,
-                marginTop: '40px',
+                background: appStyle.background,
+                color: appStyle.color,
+                transition: appStyle.transition,
               }}
             >
-              Last Updated{' '}
-              <span
-                class="material-symbols-outlined"
-                style={{
-                  opacity: 0.8,
-                }}
-              >
+              {showLocalTime
+                ? `Hide – ${
+                    weather.name
+                  } time – ${localTime.toLocaleTimeString()}`
+                : `Show  ${weather.name} time now`}
+            </button>*/}
+            <p className="last-updated">
+              Last Updated –{' '}
+              <span className="material-symbols-outlined location">
                 location_on
               </span>{' '}
               {weather.name}
@@ -785,9 +930,8 @@ export default function WeatherApp() {
                 }
               )}
             </p>
-
-            <p style={{ textAlign: 'center', opacity: 0.9 }}>
-              <strong>GMT Now :</strong>{' '}
+            <p className="gmt-now">
+              GMT Now –{' '}
               {new Date().toLocaleString('en-GB', {
                 timeZone: 'UTC',
                 weekday: 'long',
@@ -799,22 +943,9 @@ export default function WeatherApp() {
                 hour12: false,
               })}
             </p>
-            <p
-              style={{
-                fontSize: '0.8rem',
-                opacity: 0.7,
-                marginTop: '30px',
-              }}
-            >
+            <p className="powered-by">
               Powered by{' '}
-              <a
-                style={{
-                  fontSize: '0.8rem',
-                  opacity: 0.9,
-                }}
-                href="https://openweathermap.org/"
-                target="_blank"
-              >
+              <a href="https://openweathermap.org/" target="_blank">
                 OpenWeatherMap
               </a>
             </p>
