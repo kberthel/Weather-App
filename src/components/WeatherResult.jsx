@@ -50,7 +50,7 @@ export default function WeatherResult({
             thermometer
           </span>
           <span className="temp-value-tempnow">
-            {weather.temp.toFixed(1)} °C
+            {(Number(weather.temp) || 0).toFixed(1)} °C
           </span>
         </p>
         <p className="temp-line temp-feelslike">
@@ -105,7 +105,9 @@ export default function WeatherResult({
               </span>{' '}
               Temp
             </p>
-            <div className="value">{(weather.temp_max ?? 0).toFixed(1)} °C</div>
+            <div className="value">
+              {(Number(weather.temp_max) ?? 0).toFixed(1)} °C
+            </div>
           </section>
           <section className="detail-item-top temp-min">
             <p className="label">
@@ -114,7 +116,9 @@ export default function WeatherResult({
               </span>{' '}
               Temp
             </p>
-            <div className="value">{(weather.temp_min ?? 0).toFixed(1)} °C</div>
+            <div className="value">
+              {(Number(weather.temp_min) ?? 0).toFixed(1)} °C
+            </div>
           </section>
         </section>
 
