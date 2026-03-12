@@ -152,7 +152,7 @@ export default function SearchPanel({
                           )}
                         </span>
                         <span className="temp-mini">
-                          {Number(item.temp).toFixed(1) ?? '--'} °C{' '}
+                          {(Number(item.temp) || 0).toFixed(1)} °C
                         </span>
                       </span>
                     )}

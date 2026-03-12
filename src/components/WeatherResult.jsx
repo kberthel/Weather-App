@@ -56,7 +56,7 @@ export default function WeatherResult({
         <p className="temp-line temp-feelslike">
           <span className="temp-feelslike">Feels Like</span>
           <span className="temp-value-feelslike"></span>{' '}
-          {weather.feels_like.toFixed(1)} °C
+          {(Number(weather.feels_like) || 0).toFixed(1)} °C
         </p>
       </div>
       {/* 5 Day Forecast */}
@@ -93,7 +93,7 @@ export default function WeatherResult({
             </p>
             <div className="value">
               {weather.visibility != null
-                ? (weather.visibility / 1000).toFixed(1)
+                ? (Number(weather.visibility / 1000) || 0).toFixed(1)
                 : '--'}{' '}
               km
             </div>
@@ -106,7 +106,7 @@ export default function WeatherResult({
               Temp
             </p>
             <div className="value">
-              {(Number(weather.temp_max) ?? 0).toFixed(1)} °C
+              {(Number(weather.temp_max) || 0).toFixed(1)} °C
             </div>
           </section>
           <section className="detail-item-top temp-min">
@@ -117,7 +117,7 @@ export default function WeatherResult({
               Temp
             </p>
             <div className="value">
-              {(Number(weather.temp_min) ?? 0).toFixed(1)} °C
+              {(Number(weather.temp_min) || 0).toFixed(1)} °C
             </div>
           </section>
         </section>
